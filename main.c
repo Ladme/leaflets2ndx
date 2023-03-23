@@ -1,7 +1,7 @@
 // Released under MIT License.
 // Copyright (c) 2023 Ladislav Bartos
 
-// version 2023/03/23
+// version 1.1.0
 
 #include <unistd.h>
 #include <groan.h>
@@ -286,6 +286,10 @@ int main(int argc, char **argv)
     }
 
     // write out the lipids_leaflets ndx groups
+    size_t allocated_upper = 64;
+    size_t allocated_lower = 64;
+    atom_selection_t *upper = selection_create(allocated_upper);
+    atom_selection_t *lower = selection_create(allocated_lower);
     for (size_t i = 0; i < n_groups; ++i) {
 
         if (!empty && lipids_leaflets[i]->n_atoms == 0) continue;
@@ -296,22 +300,30 @@ int main(int argc, char **argv)
             fprintf(stderr, "Internal error. Reaching element of index %ld in a list_t of length %ld", i / 2, residue_names->n_items);
             fprintf(stderr, "This should never happen.\n");
             return_code = 1;
+            free(upper);
+            free(lower);
             goto main_end;
         }
 
         strncpy(group_name, resname, 99);
         if (i % 2 == 0) {
             strcat(group_name, "_lower");
+            selection_add(&lower, &allocated_lower, lipids_leaflets[i]);
         } else {
             strcat(group_name, "_upper");
+            selection_add(&upper, &allocated_upper, lipids_leaflets[i]);
         }
 
         write_ndx_group(output, group_name, lipids_leaflets[i]);
-
     }
+
+    if (empty || lower->n_atoms > 0) write_ndx_group(output, "Lower", lower);
+    if (empty || upper->n_atoms > 0) write_ndx_group(output, "Upper", upper);
 
     if (output != stdout) fclose(output);
 
+    free(upper);
+    free(lower);
     main_end:
     list_destroy(residue_names);
     destroy_selections(lipids_leaflets, n_groups);
